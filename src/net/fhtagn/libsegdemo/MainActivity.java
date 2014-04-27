@@ -1,20 +1,29 @@
 package net.fhtagn.libsegdemo;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.ViewTreeObserver;
+import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 // ImageView with zoom and pan
 // https://github.com/sephiroth74/ImageViewZoom
@@ -29,6 +38,21 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main_activity);
         mImageView = (ImageView)findViewById(R.id.imageview);
+        
+        final Uri defaultUri = Uri.parse("android.resource://"
+                + this.getPackageName() + "/" + R.drawable.default_img);
+        
+        ViewTreeObserver vto = mImageView.getViewTreeObserver(); 
+        vto.addOnGlobalLayoutListener(new OnGlobalLayoutListener() { 
+            @Override 
+            public void onGlobalLayout() {
+                // Note that we cannot reuse the same vto, have to get it again
+                mImageView.getViewTreeObserver().removeGlobalOnLayoutListener(this);
+                Log.i(TAG, "imageView : " + mImageView.getWidth() + ", " + mImageView.getHeight());
+                Log.i(TAG, "Setting default image");
+                setImage(defaultUri);
+            } 
+        });
     }
 
     @Override
@@ -55,44 +79,76 @@ public class MainActivity extends Activity {
         }
     }
     
-    public static int calculateInSampleSize(BitmapFactory.Options options,
-                                            int reqWidth,
-                                            int reqHeight) {
-        // Raw height and width of image
-        final int height = options.outHeight;
-        final int width = options.outWidth;
+    // http://stackoverflow.com/questions/3647993/android-bitmaps-loaded-from-gallery-are-rotated-in-imageview
+    public static int getOrientation(Context context, Uri photoUri) {
+        Cursor cursor = context.getContentResolver().query(photoUri,
+                new String[] { MediaStore.Images.ImageColumns.ORIENTATION },
+                null, null, null);
+        
+        if (cursor == null || cursor.getCount() != 1) {
+            return -1;
+        }
+
+        cursor.moveToFirst();
+        return cursor.getInt(0);
+    }
+
+    // http://stackoverflow.com/questions/3647993/android-bitmaps-loaded-from-gallery-are-rotated-in-imageview
+    public static Bitmap getSampledOrientedBitmap(Context context, Uri uri,
+                                                  int maxWidth, int maxHeight)
+            throws IOException {
+        InputStream is = context.getContentResolver().openInputStream(uri);
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeStream(is, null, o);
+        is.close();
+
+        int rotatedWidth, rotatedHeight;
+        int orientation = getOrientation(context, uri);
+
+        if (orientation == 90 || orientation == 270) {
+            rotatedWidth = o.outHeight;
+            rotatedHeight = o.outWidth;
+        } else {
+            rotatedWidth = o.outWidth;
+            rotatedHeight = o.outHeight;
+        }
+        
+        is = context.getContentResolver().openInputStream(uri);
+        
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = calculateInSampleSize(rotatedWidth,
+                                                     rotatedHeight,
+                                                     maxWidth,
+                                                     maxHeight);
+        Bitmap bmp = BitmapFactory.decodeStream(is, null, options);
+        if (orientation > 0) {
+            Matrix matrix = new Matrix();
+            matrix.postRotate(orientation);
+
+            bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
+                    bmp.getHeight(), matrix, true);
+        }
+        return bmp;
+    }
+    
+    public static int calculateInSampleSize(int width, int height,
+                                            int maxWidth, int maxHeight) {
         int inSampleSize = 1;
-
-        if (height > reqHeight || width > reqWidth) {
-
-            final int halfHeight = height / 2;
+        if (width > maxWidth || height > maxHeight) {
             final int halfWidth = width / 2;
-
+            final int halfHeight = height / 2;
+            
             // Calculate the largest inSampleSize value that is a power of 2 and
             // keeps both
             // height and width larger than the requested height and width.
-            while ((halfHeight / inSampleSize) > reqHeight
-                    && (halfWidth / inSampleSize) > reqWidth) {
+            while ((halfHeight / inSampleSize) > maxHeight &&
+                   (halfWidth / inSampleSize) > maxWidth) {
                 inSampleSize *= 2;
             }
         }
+        Log.i(TAG, "Scaling bitmap " + width + " * " + height + " => sampleSize=" + inSampleSize);
         return inSampleSize;
-    }
-    
-    
-    public Bitmap decodeSampledBitmap(Uri imageUri, int maxWidth, int maxHeight) throws FileNotFoundException {
-        Log.i(TAG, "Scaling bitmap to max " + maxWidth + " * " + maxHeight);
-        // First decode with inJustDecodeBounds=true to check dimensions
-        final BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inJustDecodeBounds = true;
-        InputStream stream = getContentResolver().openInputStream(imageUri);
-        BitmapFactory.decodeStream(stream, null, options);
-        
-        options.inSampleSize = calculateInSampleSize(options, maxWidth, maxHeight);
-        options.inJustDecodeBounds = false;
-        
-        stream = getContentResolver().openInputStream(imageUri);
-        return BitmapFactory.decodeStream(stream, null, options);
     }
     
     private void setImage(Bitmap image) {
@@ -105,21 +161,26 @@ public class MainActivity extends Activity {
         mImageView.setImageBitmap(image);
     }
     
+    private void setImage(Uri uri) {
+        Log.i(TAG, "imageUri : " + uri.toString());
+        try {
+            final Bitmap bitmap = getSampledOrientedBitmap(this, uri,
+                                                      mImageView.getWidth(),
+                                                      mImageView.getHeight()); 
+            setImage(bitmap);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         switch(requestCode) {
             case SELECT_PHOTO:
                 if (resultCode == RESULT_OK) {
-                    Uri imageUri = data.getData();
-                    try {
-                        final Bitmap bitmap = decodeSampledBitmap(imageUri,
-                                                                  mImageView.getWidth(),
-                                                                  mImageView.getHeight()); 
-                        setImage(bitmap);
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
+                    final Uri imageUri = data.getData();
+                    setImage(imageUri);
                 }
                 break;
         }
