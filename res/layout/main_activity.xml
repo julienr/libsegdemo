@@ -3,11 +3,45 @@
     android:id="@+id/layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical" >
+    android:orientation="horizontal" >
+    
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_margin="5dp"
+        android:orientation="vertical">
 
-    <net.fhtagn.libsegdemo.MatterView
-        android:id="@+id/matterview"
+        <RadioGroup
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <RadioButton
+                android:id="@+id/btn_plus"
+                android:scaleType="fitCenter"
+                android:adjustViewBounds="true"
+                android:button="@drawable/btn_plus" />
+            <RadioButton
+                android:id="@+id/btn_minus"
+                android:scaleType="fitCenter"
+                android:adjustViewBounds="true"
+                android:button="@drawable/btn_minus" />
+        </RadioGroup>
+    </LinearLayout>
+    
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+	    <net.fhtagn.libsegdemo.MatterView
+	        android:id="@+id/matterview"
+	        android:layout_width="0px"
+	        android:layout_weight="0.5"
+	        android:layout_height="match_parent" />
+	    
+	    <ImageView
+	        android:id="@+id/resultview"
+	        android:layout_width="0px"
+	        android:layout_weight="0.5"
+	        android:layout_height="match_parent" />
+    </LinearLayout>
 </LinearLayout>

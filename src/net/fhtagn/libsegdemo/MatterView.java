@@ -7,10 +7,12 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
 public class MatterView extends View {
+    private final static String TAG = MatterView.class.getName();
     private Paint mBitmapPaint = new Paint(Paint.DITHER_FLAG);
     
     // The original image
@@ -42,10 +44,20 @@ public class MatterView extends View {
     }
     
     public void setImage(Bitmap bitmap) {
-        mImageBitmap = bitmap;
+        final float widthRatio = bitmap.getWidth() / (float)getWidth();
+        final float heightRatio = bitmap.getHeight() / (float)getHeight();
+        final float ratio = Math.max(widthRatio, heightRatio);
         
-        mScribblesBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(),
-                                         Bitmap.Config.ARGB_8888);
+        Log.i(TAG, "ratio :" + ratio);
+        
+        final int dstWidth = (int)(bitmap.getWidth() / ratio);
+        final int dstHeight = (int)(bitmap.getHeight() / ratio);
+        
+        mImageBitmap = Bitmap.createScaledBitmap(bitmap, dstWidth, dstHeight,
+                true);
+        
+        mScribblesBitmap = Bitmap.createBitmap(mImageBitmap.getWidth(),
+                mImageBitmap.getHeight(), Bitmap.Config.ARGB_8888);
         mScribblesCanvas = new Canvas(mScribblesBitmap);
         mScribblesCanvas.drawColor(Color.TRANSPARENT);
     }

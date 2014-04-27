@@ -117,10 +117,10 @@ public class MainActivity extends Activity {
         is = context.getContentResolver().openInputStream(uri);
         
         o = new BitmapFactory.Options();
-        o.inSampleSize = calculateInSampleSizeFitFully(rotatedWidth,
-                                                       rotatedHeight,
-                                                       maxWidth,
-                                                       maxHeight);
+        o.inSampleSize = calculateInSampleSize(rotatedWidth,
+                                               rotatedHeight,
+                                               maxWidth,
+                                               maxHeight);
         Bitmap bmp = BitmapFactory.decodeStream(is, null, o);
         if (orientation > 0) {
             Matrix matrix = new Matrix();
