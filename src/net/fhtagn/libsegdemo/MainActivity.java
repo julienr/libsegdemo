@@ -31,24 +31,24 @@ public class MainActivity extends Activity {
     private static final String TAG = MainActivity.class.getName();
     private static final int SELECT_PHOTO = 1;
     
-    private ImageView mImageView;
+    private MatterView mMatterView;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main_activity);
-        mImageView = (ImageView)findViewById(R.id.imageview);
+        mMatterView = (MatterView)findViewById(R.id.matterview);
         
         final Uri defaultUri = Uri.parse("android.resource://"
                 + this.getPackageName() + "/" + R.drawable.default_img);
         
-        ViewTreeObserver vto = mImageView.getViewTreeObserver(); 
+        ViewTreeObserver vto = mMatterView.getViewTreeObserver(); 
         vto.addOnGlobalLayoutListener(new OnGlobalLayoutListener() { 
             @Override 
             public void onGlobalLayout() {
                 // Note that we cannot reuse the same vto, have to get it again
-                mImageView.getViewTreeObserver().removeGlobalOnLayoutListener(this);
-                Log.i(TAG, "imageView : " + mImageView.getWidth() + ", " + mImageView.getHeight());
+                mMatterView.getViewTreeObserver().removeGlobalOnLayoutListener(this);
+                Log.i(TAG, "imageView : " + mMatterView.getWidth() + ", " + mMatterView.getHeight());
                 Log.i(TAG, "Setting default image");
                 setImage(defaultUri);
             } 
@@ -116,12 +116,12 @@ public class MainActivity extends Activity {
         
         is = context.getContentResolver().openInputStream(uri);
         
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = calculateInSampleSize(rotatedWidth,
-                                                     rotatedHeight,
-                                                     maxWidth,
-                                                     maxHeight);
-        Bitmap bmp = BitmapFactory.decodeStream(is, null, options);
+        o = new BitmapFactory.Options();
+        o.inSampleSize = calculateInSampleSizeFitFully(rotatedWidth,
+                                                       rotatedHeight,
+                                                       maxWidth,
+                                                       maxHeight);
+        Bitmap bmp = BitmapFactory.decodeStream(is, null, o);
         if (orientation > 0) {
             Matrix matrix = new Matrix();
             matrix.postRotate(orientation);
@@ -129,9 +129,12 @@ public class MainActivity extends Activity {
             bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(),
                     bmp.getHeight(), matrix, true);
         }
+        Log.i(TAG, "Loaded bitmap : " + bmp.getWidth() + ", " + bmp.getHeight());
         return bmp;
     }
     
+    // Calculate the largest inSampleSize value that is a power of 2 and
+    // keeps both height and width larger than the requested height and width.
     public static int calculateInSampleSize(int width, int height,
                                             int maxWidth, int maxHeight) {
         int inSampleSize = 1;
@@ -139,9 +142,6 @@ public class MainActivity extends Activity {
             final int halfWidth = width / 2;
             final int halfHeight = height / 2;
             
-            // Calculate the largest inSampleSize value that is a power of 2 and
-            // keeps both
-            // height and width larger than the requested height and width.
             while ((halfHeight / inSampleSize) > maxHeight &&
                    (halfWidth / inSampleSize) > maxWidth) {
                 inSampleSize *= 2;
@@ -151,23 +151,30 @@ public class MainActivity extends Activity {
         return inSampleSize;
     }
     
-    private void setImage(Bitmap image) {
-        // Recycle current bitmap to avoid out of memory errors
-        BitmapDrawable curr = (BitmapDrawable)mImageView.getDrawable();
-        if (curr != null && curr.getBitmap() != null) {
-            curr.getBitmap().recycle();
+    // Same as calculateInSampleSize, but ensure width and height are LOWER
+    // than requested (so the image fully fits)
+    public static int calculateInSampleSizeFitFully(int width, int height,
+            int maxWidth, int maxHeight) {
+        int inSampleSize = 1;
+        if (width > maxWidth || height > maxHeight) {
+            while ((height / inSampleSize) > maxHeight ||
+                   (width / inSampleSize) > maxWidth) {
+                inSampleSize *= 2;
+            }
         }
-        
-        mImageView.setImageBitmap(image);
+        Log.i(TAG, "Scaling bitmap " + width + " * " + height
+                + " => sampleSize=" + inSampleSize);
+        return inSampleSize;
     }
     
     private void setImage(Uri uri) {
         Log.i(TAG, "imageUri : " + uri.toString());
         try {
-            final Bitmap bitmap = getSampledOrientedBitmap(this, uri,
-                                                      mImageView.getWidth(),
-                                                      mImageView.getHeight()); 
-            setImage(bitmap);
+            final Bitmap bitmap = getSampledOrientedBitmap(this,
+                                                           uri,
+                                                           mMatterView.getWidth(),
+                                                           mMatterView.getHeight()); 
+            mMatterView.setImage(bitmap);
         } catch (IOException e) {
             e.printStackTrace();
         }
