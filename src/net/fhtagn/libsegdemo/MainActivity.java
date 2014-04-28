@@ -20,10 +20,13 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
 
 // ImageView with zoom and pan
 // https://github.com/sephiroth74/ImageViewZoom
@@ -41,6 +44,26 @@ public class MainActivity extends Activity {
         
         final Uri defaultUri = Uri.parse("android.resource://"
                 + this.getPackageName() + "/" + R.drawable.default_img);
+        
+        final RadioButton plusBtn = (RadioButton)findViewById(R.id.btn_plus);
+        plusBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View arg0) {
+                Log.i(TAG, "plus click");
+                mMatterView.setDrawMode(MatterView.DrawMode.FOREGROUND);
+            }
+        });
+        final RadioButton minusBtn = (RadioButton)findViewById(R.id.btn_minus);
+        minusBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View arg0) {
+                Log.i(TAG, "minus click");
+                mMatterView.setDrawMode(MatterView.DrawMode.BACKGROUND);
+            }
+        });
+        
+        plusBtn.setChecked(true);
+        mMatterView.setDrawMode(MatterView.DrawMode.FOREGROUND);
         
         ViewTreeObserver vto = mMatterView.getViewTreeObserver(); 
         vto.addOnGlobalLayoutListener(new OnGlobalLayoutListener() { 

@@ -1,11 +1,14 @@
 package net.fhtagn.libsegdemo;
 
+import net.fhtagn.libseg.SimpleMatter;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff.Mode;
+import android.graphics.PorterDuffXfermode;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -13,15 +16,31 @@ import android.view.View;
 
 public class MatterView extends View {
     private final static String TAG = MatterView.class.getName();
-    private Paint mBitmapPaint = new Paint(Paint.DITHER_FLAG);
+    private static Paint mBitmapPaint = new Paint(Paint.DITHER_FLAG);
+    private static Paint mBitmapPaintAtop = new Paint(Paint.DITHER_FLAG);
+    static {
+        mBitmapPaintAtop.setXfermode(new PorterDuffXfermode(Mode.SRC_ATOP));
+    }
+    
+    public static enum DrawMode {
+        FOREGROUND,
+        BACKGROUND
+    }
+    
+    private DrawMode drawMode = DrawMode.FOREGROUND;
+    
+    private SimpleMatter matter;
     
     // The original image
-    private Bitmap mImageBitmap;
-    private Bitmap mScribblesBitmap;
-    private Canvas mScribblesCanvas;
+    /*private Bitmap mImageBitmap;
+    private Bitmap mScribblesBitmap;*/
+    //private Canvas mScribblesCanvas;
+    private Canvas mBgCanvas;
+    private Canvas mFgCanvas;
     
     private Paint mCirclePaint;
-    private Paint mLinePaint;
+    private Paint mFgLinePaint;
+    private Paint mBgLinePaint;
     
     public MatterView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -33,17 +52,27 @@ public class MatterView extends View {
         mCirclePaint.setStrokeJoin(Paint.Join.MITER);
         mCirclePaint.setStrokeWidth(4f); 
         
-        mLinePaint = new Paint();
-        mLinePaint.setAntiAlias(true);
-        mLinePaint.setDither(true);
-        mLinePaint.setColor(0xFFFF0000);
-        mLinePaint.setStyle(Paint.Style.STROKE);
-        mLinePaint.setStrokeJoin(Paint.Join.ROUND);
-        mLinePaint.setStrokeCap(Paint.Cap.ROUND);
-        mLinePaint.setStrokeWidth(20);
+        mFgLinePaint = createLinePaint(0xFF00FF00);
+        mBgLinePaint = createLinePaint(0xFFFF0000);
     }
     
-    public void setImage(Bitmap bitmap) {
+    private Paint createLinePaint(int color) {
+        Paint p = new Paint();
+        p.setAntiAlias(true);
+        p.setDither(true);
+        p.setColor(color);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeJoin(Paint.Join.ROUND);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        p.setStrokeWidth(20);
+        return p;
+    }
+    
+    public void setDrawMode(DrawMode dm) {
+        drawMode = dm;
+    }
+    
+    public void setImage(Bitmap bitmap) { 
         final float widthRatio = bitmap.getWidth() / (float)getWidth();
         final float heightRatio = bitmap.getHeight() / (float)getHeight();
         final float ratio = Math.max(widthRatio, heightRatio);
@@ -53,25 +82,32 @@ public class MatterView extends View {
         final int dstWidth = (int)(bitmap.getWidth() / ratio);
         final int dstHeight = (int)(bitmap.getHeight() / ratio);
         
-        mImageBitmap = Bitmap.createScaledBitmap(bitmap, dstWidth, dstHeight,
-                true);
+        final Bitmap scaled = Bitmap.createScaledBitmap(bitmap, dstWidth,
+                dstHeight, true);
         
-        mScribblesBitmap = Bitmap.createBitmap(mImageBitmap.getWidth(),
-                mImageBitmap.getHeight(), Bitmap.Config.ARGB_8888);
-        mScribblesCanvas = new Canvas(mScribblesBitmap);
-        mScribblesCanvas.drawColor(Color.TRANSPARENT);
+        matter = new SimpleMatter(scaled);
+        mBgCanvas = new Canvas(matter.bgScribbles);
+        mBgCanvas.drawColor(Color.TRANSPARENT);
+        mFgCanvas = new Canvas(matter.fgScribbles);
+        mFgCanvas.drawColor(Color.TRANSPARENT);
     }
     
     @Override
     protected void onDraw(Canvas canvas) {
-        if (mImageBitmap != null) {
-            canvas.drawBitmap(mImageBitmap, 0, 0, mBitmapPaint);
-        }
-        if (mScribblesBitmap != null) {
-            canvas.drawBitmap(mScribblesBitmap, 0, 0, mBitmapPaint);
+        if (matter != null) {
+            canvas.drawBitmap(matter.image, 0, 0, mBitmapPaint);
+            canvas.drawBitmap(matter.bgScribbles, 0, 0, mBitmapPaintAtop);
+            canvas.drawBitmap(matter.fgScribbles, 0, 0, mBitmapPaintAtop);
         }
         
-        canvas.drawPath(mPath, mLinePaint);
+        switch (drawMode) {
+            case FOREGROUND:
+                canvas.drawPath(mPath, mFgLinePaint);
+                break;
+            case BACKGROUND:
+                canvas.drawPath(mPath, mBgLinePaint);
+                break;
+        }
         canvas.drawPath(mCirclePath, mCirclePaint);
     }
     
@@ -104,7 +140,15 @@ public class MatterView extends View {
     private void touchUp() {
         mPath.lineTo(mX, mY);
         mCirclePath.reset();
-        mScribblesCanvas.drawPath(mPath, mLinePaint);
+        
+        switch(drawMode) {
+            case BACKGROUND:
+                mBgCanvas.drawPath(mPath, mBgLinePaint);
+                break;
+            case FOREGROUND:
+                mFgCanvas.drawPath(mPath, mFgLinePaint);
+                break;
+        }
         mPath.reset();
     }
     
