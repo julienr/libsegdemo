@@ -35,12 +35,14 @@ public class MainActivity extends Activity {
     private static final int SELECT_PHOTO = 1;
     
     private MatterView mMatterView;
+    private ResultView mResultView;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main_activity);
         mMatterView = (MatterView)findViewById(R.id.matterview);
+        mResultView = (ResultView)findViewById(R.id.resultview);
         
         final Uri defaultUri = Uri.parse("android.resource://"
                 + this.getPackageName() + "/" + R.drawable.default_img);
@@ -197,7 +199,7 @@ public class MainActivity extends Activity {
                                                            uri,
                                                            mMatterView.getWidth(),
                                                            mMatterView.getHeight()); 
-            mMatterView.setImage(bitmap);
+            mMatterView.setImage(bitmap, mResultView);
         } catch (IOException e) {
             e.printStackTrace();
         }

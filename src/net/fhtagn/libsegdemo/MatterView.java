@@ -1,5 +1,8 @@
 package net.fhtagn.libsegdemo;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import net.fhtagn.libseg.SimpleMatter;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -12,8 +15,12 @@ import android.graphics.PorterDuffXfermode;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.SurfaceView;
 import android.view.View;
+import android.widget.ImageView;
 
+// Porter Duff modes visual :
+// http://ssp.impulsetrain.com/porterduff.html
 public class MatterView extends View {
     private final static String TAG = MatterView.class.getName();
     private static Paint mBitmapPaint = new Paint(Paint.DITHER_FLAG);
@@ -29,18 +36,17 @@ public class MatterView extends View {
     
     private DrawMode drawMode = DrawMode.FOREGROUND;
     
-    private SimpleMatter matter;
-    
-    // The original image
-    /*private Bitmap mImageBitmap;
-    private Bitmap mScribblesBitmap;*/
-    //private Canvas mScribblesCanvas;
+    private SimpleMatter mMatter;
     private Canvas mBgCanvas;
     private Canvas mFgCanvas;
     
     private Paint mCirclePaint;
     private Paint mFgLinePaint;
     private Paint mBgLinePaint;
+    
+    private ResultView mResultView;
+    
+    private ExecutorService mExecutor = Executors.newSingleThreadExecutor();
     
     public MatterView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -72,7 +78,7 @@ public class MatterView extends View {
         drawMode = dm;
     }
     
-    public void setImage(Bitmap bitmap) { 
+    public void setImage(Bitmap bitmap, ResultView rv) { 
         final float widthRatio = bitmap.getWidth() / (float)getWidth();
         final float heightRatio = bitmap.getHeight() / (float)getHeight();
         final float ratio = Math.max(widthRatio, heightRatio);
@@ -85,19 +91,21 @@ public class MatterView extends View {
         final Bitmap scaled = Bitmap.createScaledBitmap(bitmap, dstWidth,
                 dstHeight, true);
         
-        matter = new SimpleMatter(scaled);
-        mBgCanvas = new Canvas(matter.bgScribbles);
+        mResultView = rv;
+        mMatter = new SimpleMatter(scaled);
+        rv.setMatter(mMatter);
+        mBgCanvas = new Canvas(mMatter.bgScribbles);
         mBgCanvas.drawColor(Color.TRANSPARENT);
-        mFgCanvas = new Canvas(matter.fgScribbles);
+        mFgCanvas = new Canvas(mMatter.fgScribbles);
         mFgCanvas.drawColor(Color.TRANSPARENT);
     }
     
     @Override
     protected void onDraw(Canvas canvas) {
-        if (matter != null) {
-            canvas.drawBitmap(matter.image, 0, 0, mBitmapPaint);
-            canvas.drawBitmap(matter.bgScribbles, 0, 0, mBitmapPaintAtop);
-            canvas.drawBitmap(matter.fgScribbles, 0, 0, mBitmapPaintAtop);
+        if (mMatter != null) {
+            canvas.drawBitmap(mMatter.image, 0, 0, mBitmapPaint);
+            canvas.drawBitmap(mMatter.bgScribbles, 0, 0, mBitmapPaintAtop);
+            canvas.drawBitmap(mMatter.fgScribbles, 0, 0, mBitmapPaintAtop);
         }
         
         switch (drawMode) {
@@ -109,6 +117,25 @@ public class MatterView extends View {
                 break;
         }
         canvas.drawPath(mCirclePath, mCirclePaint);
+    }
+    
+    private void updateMatter() {
+        // TODO: We might want to rate-limit, especially if we have lots of
+        // call to updateMatter in a short period.
+        // Basically, we should really call updateMatter 300ms after the last
+        // call to updateMatter if nothing happened in-between
+        // TODO: Look at ScheduledThreadExecutor
+        mExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                Log.i(TAG, "Update matter");
+                mMatter.updateMatter();
+                if (mResultView != null) {
+                    Log.i(TAG, "Updating resultview");
+                    mResultView.postInvalidate();
+                }
+            }
+        });
     }
     
     // http://stackoverflow.com/questions/16650419/draw-in-canvas-by-finger-android
@@ -150,6 +177,8 @@ public class MatterView extends View {
                 break;
         }
         mPath.reset();
+        
+        updateMatter();
     }
     
     @Override

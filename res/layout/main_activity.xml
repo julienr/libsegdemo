@@ -32,7 +32,7 @@
 	        android:layout_weight="0.5"
 	        android:layout_height="match_parent" />
 	    
-	    <ImageView
+	    <net.fhtagn.libsegdemo.ResultView
 	        android:id="@+id/resultview"
 	        android:layout_width="0px"
 	        android:layout_weight="0.5"
